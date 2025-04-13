@@ -20,20 +20,16 @@ def compute_greeks(spot, strike, t, r, sigma, d1, d2):
     rho_put = -strike * t * np.exp(-r * t) * norm.cdf(-d2) / 100
     vanna = (vega / spot) * (1 - d1 / (sigma * np.sqrt(t)))
     charm_call = -N_prime(d1) * (2 * r * t - d2 * sigma * np.sqrt(t)) / (2 * t * sigma * np.sqrt(t)) / 365
-    charm_put = -charm_call  # Simplified assumption
+    charm_put = -charm_call
 
     return {
-        'Delta (Call)': delta_call,
-        'Delta (Put)': delta_put,
+        'Delta': delta_call if option_type.get() in ['Long Call', 'Short Call'] else delta_put,
         'Gamma': gamma,
-        'Theta (Call)': theta_call,
-        'Theta (Put)': theta_put,
-        'Rho (Call)': rho_call,
-        'Rho (Put)': rho_put,
+        'Theta': theta_call if option_type.get() in ['Long Call', 'Short Call'] else theta_put,
+        'Rho': rho_call if option_type.get() in ['Long Call', 'Short Call'] else rho_put,
         'Vega': vega,
         'Vanna': vanna,
-        'Charm (Call)': charm_call,
-        'Charm (Put)': charm_put
+        'Charm': charm_call if option_type.get() in ['Long Call', 'Short Call'] else charm_put
     }
 
 # Black-Scholes pricing
@@ -45,16 +41,23 @@ def black_scholes(spot, strike, r, sigma, t):
     return call, put, d1, d2
 
 # Payoff graph
-def plot_payoff_graph(spot, strike, call_price, put_price):
+def plot_payoff_graph(spot, strike, premium, option):
     x = np.arange(spot * 0.5, spot * 1.5, 1)
-    long_call = np.maximum(x - strike, 0) - call_price
-    long_put = np.maximum(strike - x, 0) - put_price
+    if option == 'Long Call':
+        y = np.maximum(x - strike, 0) - premium
+    elif option == 'Short Call':
+        y = -np.maximum(x - strike, 0) + premium
+    elif option == 'Long Put':
+        y = np.maximum(strike - x, 0) - premium
+    elif option == 'Short Put':
+        y = -np.maximum(strike - x, 0) + premium
+    else:
+        y = np.zeros_like(x)
 
     plt.figure(figsize=(10, 5))
-    plt.plot(x, long_call, label='Long Call', color='green')
-    plt.plot(x, long_put, label='Long Put', color='blue')
+    plt.plot(x, y, label=option, color='darkorange')
     plt.axhline(0, color='black', linewidth=0.5)
-    plt.title('Option Payoff')
+    plt.title(f'{option} Payoff')
     plt.xlabel('Spot Price')
     plt.ylabel('P&L')
     plt.legend()
@@ -74,12 +77,19 @@ def launch_gui():
         t = (end - start).days / 365.0
 
         call_price, put_price, d1, d2 = black_scholes(spot, strike, r, sigma, t)
+
+        if option_type.get() in ['Long Call', 'Short Call']:
+            premium = call_price
+        else:
+            premium = put_price
+
         greeks = compute_greeks(spot, strike, t, r, sigma, d1, d2)
 
-        result.set(f"Call Price: {call_price:.2f}, Put Price: {put_price:.2f}")
+        result.set(f"{option_type.get()} Premium: {premium:.2f}")
         greek_text = "\n".join([f"{k}: {v:.4f}" for k, v in greeks.items()])
         greeks_label.config(text=greek_text)
-        plot_payoff_graph(spot, strike, call_price, put_price)
+
+        plot_payoff_graph(spot, strike, premium, option_type.get())
 
     root = tk.Tk()
     root.title("Vanilla Option Pricer & Greeks")
@@ -112,12 +122,17 @@ def launch_gui():
     end_cal = DateEntry(root, width=12, background='darkblue', foreground='white', borderwidth=2)
     end_cal.grid(row=5, column=1)
 
-    tk.Button(root, text="Calculate", command=calculate).grid(row=6, columnspan=2, pady=10)
+    tk.Label(root, text="Option Type").grid(row=6, column=0)
+    option_type = ttk.Combobox(root, values=["Long Call", "Short Call", "Long Put", "Short Put"])
+    option_type.current(0)
+    option_type.grid(row=6, column=1)
+
+    tk.Button(root, text="Calculate", command=calculate).grid(row=7, columnspan=2, pady=10)
 
     result = tk.StringVar()
-    tk.Label(root, textvariable=result, font=("Arial", 12)).grid(row=7, columnspan=2)
+    tk.Label(root, textvariable=result, font=("Arial", 12)).grid(row=8, columnspan=2)
     greeks_label = tk.Label(root, justify="left", font=("Courier", 10))
-    greeks_label.grid(row=8, columnspan=2)
+    greeks_label.grid(row=9, columnspan=2)
 
     root.mainloop()
 
