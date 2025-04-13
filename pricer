@@ -1,4 +1,11 @@
 # Option Pricer GUI with Greeks and Interactive Inputs
+pip install tkcalendar
+pip install matplotlib
+pip install numpy
+pip install scipy
+pip install tk
+
+# Import necessary libraries
 import numpy as np
 from scipy.stats import norm
 import tkinter as tk
