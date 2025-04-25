@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 import streamlit as st
+import json
 
 def black_scholes(spot, strike, taux, maturite, volatilite, option_type='call'):
     # Conversion de la maturité en années
@@ -56,7 +57,6 @@ def plot_payoff(spot, strike, position):
 
 def plot_greeks(spot, strike, taux, maturite, volatilite, position):
     spot_range = np.linspace(spot * 0.5, spot * 1.5, 500)
-    prices = []
     deltas = []
     gammas = []
     vegas = []
@@ -67,7 +67,6 @@ def plot_greeks(spot, strike, taux, maturite, volatilite, position):
 
     for s in spot_range:
         price, delta, gamma, vega, theta, rho = black_scholes(s, strike, taux, maturite, volatilite, option_type)
-        prices.append(price)
         deltas.append(delta)
         gammas.append(gamma)
         vegas.append(vega)
@@ -77,41 +76,34 @@ def plot_greeks(spot, strike, taux, maturite, volatilite, position):
     plt.figure(figsize=(12, 10))
 
     plt.subplot(3, 2, 1)
-    plt.plot(spot_range, prices, label=f'{position} Price')
-    plt.xlabel('Spot Price')
-    plt.ylabel('Price')
-    plt.title(f'{position} Price')
-    plt.grid(True)
-
-    plt.subplot(3, 2, 2)
     plt.plot(spot_range, deltas, label=f'{position} Delta')
     plt.xlabel('Spot Price')
     plt.ylabel('Delta')
     plt.title(f'{position} Delta')
     plt.grid(True)
 
-    plt.subplot(3, 2, 3)
+    plt.subplot(3, 2, 2)
     plt.plot(spot_range, gammas, label=f'{position} Gamma')
     plt.xlabel('Spot Price')
     plt.ylabel('Gamma')
     plt.title(f'{position} Gamma')
     plt.grid(True)
 
-    plt.subplot(3, 2, 4)
+    plt.subplot(3, 2, 3)
     plt.plot(spot_range, vegas, label=f'{position} Vega')
     plt.xlabel('Spot Price')
     plt.ylabel('Vega')
     plt.title(f'{position} Vega')
     plt.grid(True)
 
-    plt.subplot(3, 2, 5)
+    plt.subplot(3, 2, 4)
     plt.plot(spot_range, thetas, label=f'{position} Theta')
     plt.xlabel('Spot Price')
     plt.ylabel('Theta')
     plt.title(f'{position} Theta')
     plt.grid(True)
 
-    plt.subplot(3, 2, 6)
+    plt.subplot(3, 2, 5)
     plt.plot(spot_range, rhos, label=f'{position} Rho')
     plt.xlabel('Spot Price')
     plt.ylabel('Rho')
@@ -120,6 +112,19 @@ def plot_greeks(spot, strike, taux, maturite, volatilite, position):
 
     plt.tight_layout()
     st.pyplot(plt)
+
+def export_data(spot, strike, taux, maturite, volatilite, df_results):
+    data = {
+        'inputs': {
+            'spot': spot,
+            'strike': strike,
+            'taux': taux,
+            'maturite': maturite,
+            'volatilite': volatilite
+        },
+        'outputs': df_results.to_dict(orient='records')
+    }
+    return json.dumps(data, indent=4)
 
 # Interface utilisateur avec Streamlit
 st.title("Option Pricing avec Black-Scholes")
@@ -139,3 +144,12 @@ if st.button("Calculer"):
         st.write(f"### {position}")
         plot_payoff(spot, strike, position)
         plot_greeks(spot, strike, taux, maturite, volatilite, position)
+
+    if st.button("Exporter les données"):
+        exported_data = export_data(spot, strike, taux, maturite, volatilite, df_results)
+        st.download_button(
+            label="Télécharger les données",
+            data=exported_data,
+            file_name="option_pricing_data.json",
+            mime="application/json"
+        )
