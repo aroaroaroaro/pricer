@@ -3,8 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 import streamlit as st
-import io
-import zipfile
 
 def black_scholes(spot, strike, taux, maturite, volatilite, option_type='call'):
     # Conversion de la maturité en années
@@ -54,7 +52,7 @@ def plot_payoff(spot, strike, position):
     plt.title(f'{position} Payoff')
     plt.legend()
     plt.grid(True)
-    return plt
+    st.pyplot(plt)
 
 def plot_greeks(spot, strike, taux, maturite, volatilite, position):
     spot_range = np.linspace(spot * 0.5, spot * 1.5, 500)
@@ -112,43 +110,7 @@ def plot_greeks(spot, strike, taux, maturite, volatilite, position):
     plt.grid(True)
 
     plt.tight_layout()
-    return plt
-
-def export_data(spot, strike, taux, maturite, volatilite, df_results, payoff_plots, greeks_plots):
-    # Create a bytes buffer to save the zip file
-    zip_buffer = io.BytesIO()
-
-    with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED, False) as zip_file:
-        # Save inputs as CSV
-        inputs_data = pd.DataFrame({
-            'spot': [spot],
-            'strike': [strike],
-            'taux': [taux],
-            'maturite': [maturite],
-            'volatilite': [volatilite]
-        })
-        inputs_csv = inputs_data.to_csv(index=False)
-        zip_file.writestr("inputs.csv", inputs_csv)
-
-        # Save outputs as CSV
-        outputs_csv = df_results.to_csv(index=False)
-        zip_file.writestr("outputs.csv", outputs_csv)
-
-        # Save payoff plots
-        for position, plt in payoff_plots.items():
-            img_buffer = io.BytesIO()
-            plt.savefig(img_buffer, format='png')
-            img_buffer.seek(0)
-            zip_file.writestr(f"{position}_payoff.png", img_buffer.getvalue())
-
-        # Save greeks plots
-        for position, plt in greeks_plots.items():
-            img_buffer = io.BytesIO()
-            plt.savefig(img_buffer, format='png')
-            img_buffer.seek(0)
-            zip_file.writestr(f"{position}_greeks.png", img_buffer.getvalue())
-
-    return zip_buffer
+    st.pyplot(plt)
 
 # Interface utilisateur avec Streamlit
 st.title("Option Pricing avec Black-Scholes")
@@ -163,24 +125,8 @@ if st.button("Calculer"):
     df_results = calculate_options(spot, strike, taux, maturite, volatilite)
     st.write(df_results)
 
-    payoff_plots = {}
-    greeks_plots = {}
     positions = ['Call', 'Put']
     for position in positions:
         st.write(f"### {position}")
-        payoff_plt = plot_payoff(spot, strike, position)
-        payoff_plots[position] = payoff_plt
-        st.pyplot(payoff_plt)
-
-        greeks_plt = plot_greeks(spot, strike, taux, maturite, volatilite, position)
-        greeks_plots[position] = greeks_plt
-        st.pyplot(greeks_plt)
-
-    if st.button("Exporter les données"):
-        zip_buffer = export_data(spot, strike, taux, maturite, volatilite, df_results, payoff_plots, greeks_plots)
-        st.download_button(
-            label="Télécharger les données",
-            data=zip_buffer,
-            file_name="option_pricing_data.zip",
-            mime="application/zip"
-        )
+        plot_payoff(spot, strike, position)
+        plot_greeks(spot, strike, taux, maturite, volatilite, position)
