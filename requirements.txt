@@ -3,3 +3,6 @@ pandas
 matplotlib
 scipy
 streamlit
+io
+zipfile
+datetime
