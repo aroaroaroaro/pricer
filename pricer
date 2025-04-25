@@ -1,147 +1,146 @@
-# Option Pricer GUI with Greeks and Interactive Inputs
-pip install tkcalendar
-pip install matplotlib
-pip install numpy
-pip install scipy
-pip install tk
-
-# Import necessary libraries
 import numpy as np
-from scipy.stats import norm
-import tkinter as tk
-from tkinter import ttk
-from tkcalendar import DateEntry
+import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime
+from scipy.stats import norm
 
-# Greeks calculation functions
-def compute_greeks(spot, strike, t, r, sigma, d1, d2):
-    N_prime = lambda x: np.exp(-x**2 / 2) / np.sqrt(2 * np.pi)
-    delta_call = norm.cdf(d1)
-    delta_put = delta_call - 1
-    gamma = N_prime(d1) / (spot * sigma * np.sqrt(t))
-    vega = spot * N_prime(d1) * np.sqrt(t) / 100
-    theta_call = (-spot * N_prime(d1) * sigma / (2 * np.sqrt(t)) - r * strike * np.exp(-r * t) * norm.cdf(d2)) / 365
-    theta_put = (-spot * N_prime(d1) * sigma / (2 * np.sqrt(t)) + r * strike * np.exp(-r * t) * norm.cdf(-d2)) / 365
-    rho_call = strike * t * np.exp(-r * t) * norm.cdf(d2) / 100
-    rho_put = -strike * t * np.exp(-r * t) * norm.cdf(-d2) / 100
-    vanna = (vega / spot) * (1 - d1 / (sigma * np.sqrt(t)))
-    charm_call = -N_prime(d1) * (2 * r * t - d2 * sigma * np.sqrt(t)) / (2 * t * sigma * np.sqrt(t)) / 365
-    charm_put = -charm_call
+def black_scholes(spot, strike, taux, maturite, volatilite, option_type='call'):
+    # Conversion de la maturité en années
+    T = maturite / 365.0
 
-    return {
-        'Delta': delta_call if option_type.get() in ['Long Call', 'Short Call'] else delta_put,
-        'Gamma': gamma,
-        'Theta': theta_call if option_type.get() in ['Long Call', 'Short Call'] else theta_put,
-        'Rho': rho_call if option_type.get() in ['Long Call', 'Short Call'] else rho_put,
-        'Vega': vega,
-        'Vanna': vanna,
-        'Charm': charm_call if option_type.get() in ['Long Call', 'Short Call'] else charm_put
-    }
+    # Calcul des paramètres intermédiaires
+    d1 = (np.log(spot / strike) + (taux + 0.5 * volatilite**2) * T) / (volatilite * np.sqrt(T))
+    d2 = d1 - volatilite * np.sqrt(T)
 
-# Black-Scholes pricing
-def black_scholes(spot, strike, r, sigma, t):
-    d1 = (np.log(spot / strike) + (r + 0.5 * sigma ** 2) * t) / (sigma * np.sqrt(t))
-    d2 = d1 - sigma * np.sqrt(t)
-    call = spot * norm.cdf(d1) - strike * np.exp(-r * t) * norm.cdf(d2)
-    put = strike * np.exp(-r * t) * norm.cdf(-d2) - spot * norm.cdf(-d1)
-    return call, put, d1, d2
+    if option_type == 'call':
+        price = spot * norm.cdf(d1) - strike * np.exp(-taux * T) * norm.cdf(d2)
+        delta = norm.cdf(d1)
+    elif option_type == 'put':
+        price = strike * np.exp(-taux * T) * norm.cdf(-d2) - spot * norm.cdf(-d1)
+        delta = norm.cdf(d1) - 1
 
-# Payoff graph
-def plot_payoff_graph(spot, strike, premium, option):
-    x = np.arange(spot * 0.5, spot * 1.5, 1)
-    if option == 'Long Call':
-        y = np.maximum(x - strike, 0) - premium
-    elif option == 'Short Call':
-        y = -np.maximum(x - strike, 0) + premium
-    elif option == 'Long Put':
-        y = np.maximum(strike - x, 0) - premium
-    elif option == 'Short Put':
-        y = -np.maximum(strike - x, 0) + premium
-    else:
-        y = np.zeros_like(x)
+    gamma = norm.pdf(d1) / (spot * volatilite * np.sqrt(T))
+    vega = spot * norm.pdf(d1) * np.sqrt(T)
+    theta = -(spot * norm.pdf(d1) * volatilite) / (2 * np.sqrt(T)) - taux * strike * np.exp(-taux * T) * norm.cdf(d2)
+    rho = strike * T * np.exp(-taux * T) * norm.cdf(d2)
 
-    plt.figure(figsize=(10, 5))
-    plt.plot(x, y, label=option, color='darkorange')
-    plt.axhline(0, color='black', linewidth=0.5)
-    plt.title(f'{option} Payoff')
+    return price, delta, gamma, vega, theta, rho
+
+def calculate_options(spot, strike, taux, maturite, volatilite):
+    positions = ['Long Call', 'Long Put', 'Short Call', 'Short Put']
+    results = []
+
+    for position in positions:
+        option_type = 'call' if 'Call' in position else 'put'
+        price, delta, gamma, vega, theta, rho = black_scholes(spot, strike, taux, maturite, volatilite, option_type)
+
+        if 'Short' in position:
+            price, delta, gamma, vega, theta, rho = -price, -delta, gamma, vega, -theta, -rho
+
+        results.append([position, price, delta, gamma, vega, theta, rho])
+
+    df_results = pd.DataFrame(results, columns=['Position', 'Price', 'Delta', 'Gamma', 'Vega', 'Theta', 'Rho'])
+    return df_results
+
+def plot_payoff(spot, strike, position):
+    spot_range = np.linspace(spot * 0.5, spot * 1.5, 500)
+    if 'Call' in position:
+        payoff = np.maximum(spot_range - strike, 0)
+    elif 'Put' in position:
+        payoff = np.maximum(strike - spot_range, 0)
+
+    if 'Short' in position:
+        payoff = -payoff
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(spot_range, payoff, label=f'{position} Payoff')
     plt.xlabel('Spot Price')
-    plt.ylabel('P&L')
+    plt.ylabel('Payoff')
+    plt.title(f'{position} Payoff')
     plt.legend()
     plt.grid(True)
     plt.show()
 
-# Main GUI function
-def launch_gui():
-    def calculate():
-        spot = spot_scale.get()
-        strike = strike_scale.get()
-        r = rate_scale.get() / 100
-        sigma = vol_scale.get() / 100
+def plot_greeks(spot, strike, taux, maturite, volatilite, position):
+    spot_range = np.linspace(spot * 0.5, spot * 1.5, 500)
+    prices = []
+    deltas = []
+    gammas = []
+    vegas = []
+    thetas = []
+    rhos = []
 
-        start = datetime.strptime(start_cal.get(), '%m/%d/%y')
-        end = datetime.strptime(end_cal.get(), '%m/%d/%y')
-        t = (end - start).days / 365.0
+    option_type = 'call' if 'Call' in position else 'put'
 
-        call_price, put_price, d1, d2 = black_scholes(spot, strike, r, sigma, t)
+    for s in spot_range:
+        price, delta, gamma, vega, theta, rho = black_scholes(s, strike, taux, maturite, volatilite, option_type)
+        if 'Short' in position:
+            price, delta, theta, rho = -price, -delta, -theta, -rho
 
-        if option_type.get() in ['Long Call', 'Short Call']:
-            premium = call_price
-        else:
-            premium = put_price
+        prices.append(price)
+        deltas.append(delta)
+        gammas.append(gamma)
+        vegas.append(vega)
+        thetas.append(theta)
+        rhos.append(rho)
 
-        greeks = compute_greeks(spot, strike, t, r, sigma, d1, d2)
+    plt.figure(figsize=(12, 10))
 
-        result.set(f"{option_type.get()} Premium: {premium:.2f}")
-        greek_text = "\n".join([f"{k}: {v:.4f}" for k, v in greeks.items()])
-        greeks_label.config(text=greek_text)
+    plt.subplot(3, 2, 1)
+    plt.plot(spot_range, prices, label=f'{position} Price')
+    plt.xlabel('Spot Price')
+    plt.ylabel('Price')
+    plt.title(f'{position} Price')
+    plt.grid(True)
 
-        plot_payoff_graph(spot, strike, premium, option_type.get())
+    plt.subplot(3, 2, 2)
+    plt.plot(spot_range, deltas, label=f'{position} Delta')
+    plt.xlabel('Spot Price')
+    plt.ylabel('Delta')
+    plt.title(f'{position} Delta')
+    plt.grid(True)
 
-    root = tk.Tk()
-    root.title("Vanilla Option Pricer & Greeks")
+    plt.subplot(3, 2, 3)
+    plt.plot(spot_range, gammas, label=f'{position} Gamma')
+    plt.xlabel('Spot Price')
+    plt.ylabel('Gamma')
+    plt.title(f'{position} Gamma')
+    plt.grid(True)
 
-    tk.Label(root, text="Spot Price").grid(row=0, column=0)
-    spot_scale = tk.Scale(root, from_=50, to=200, orient="horizontal")
-    spot_scale.set(100)
-    spot_scale.grid(row=0, column=1)
+    plt.subplot(3, 2, 4)
+    plt.plot(spot_range, vegas, label=f'{position} Vega')
+    plt.xlabel('Spot Price')
+    plt.ylabel('Vega')
+    plt.title(f'{position} Vega')
+    plt.grid(True)
 
-    tk.Label(root, text="Strike Price").grid(row=1, column=0)
-    strike_scale = tk.Scale(root, from_=50, to=200, orient="horizontal")
-    strike_scale.set(110)
-    strike_scale.grid(row=1, column=1)
+    plt.subplot(3, 2, 5)
+    plt.plot(spot_range, thetas, label=f'{position} Theta')
+    plt.xlabel('Spot Price')
+    plt.ylabel('Theta')
+    plt.title(f'{position} Theta')
+    plt.grid(True)
 
-    tk.Label(root, text="Volatility (%)").grid(row=2, column=0)
-    vol_scale = tk.Scale(root, from_=1, to=100, orient="horizontal")
-    vol_scale.set(20)
-    vol_scale.grid(row=2, column=1)
+    plt.subplot(3, 2, 6)
+    plt.plot(spot_range, rhos, label=f'{position} Rho')
+    plt.xlabel('Spot Price')
+    plt.ylabel('Rho')
+    plt.title(f'{position} Rho')
+    plt.grid(True)
 
-    tk.Label(root, text="Risk-Free Rate (%)").grid(row=3, column=0)
-    rate_scale = tk.Scale(root, from_=0, to=10, resolution=0.1, orient="horizontal")
-    rate_scale.set(2.5)
-    rate_scale.grid(row=3, column=1)
+    plt.tight_layout()
+    plt.show()
 
-    tk.Label(root, text="Purchase Date").grid(row=4, column=0)
-    start_cal = DateEntry(root, width=12, background='darkblue', foreground='white', borderwidth=2)
-    start_cal.grid(row=4, column=1)
+# Exemple d'utilisation
+spot = 100
+strike = 100
+taux = 0.05
+maturite = 30  # en jours
+volatilite = 0.2
 
-    tk.Label(root, text="Maturity Date").grid(row=5, column=0)
-    end_cal = DateEntry(root, width=12, background='darkblue', foreground='white', borderwidth=2)
-    end_cal.grid(row=5, column=1)
+df_results = calculate_options(spot, strike, taux, maturite, volatilite)
+print(df_results)
 
-    tk.Label(root, text="Option Type").grid(row=6, column=0)
-    option_type = ttk.Combobox(root, values=["Long Call", "Short Call", "Long Put", "Short Put"])
-    option_type.current(0)
-    option_type.grid(row=6, column=1)
-
-    tk.Button(root, text="Calculate", command=calculate).grid(row=7, columnspan=2, pady=10)
-
-    result = tk.StringVar()
-    tk.Label(root, textvariable=result, font=("Arial", 12)).grid(row=8, columnspan=2)
-    greeks_label = tk.Label(root, justify="left", font=("Courier", 10))
-    greeks_label.grid(row=9, columnspan=2)
-
-    root.mainloop()
-
-if __name__ == '__main__':
-    launch_gui()
+positions = ['Long Call', 'Long Put', 'Short Call', 'Short Put']
+for position in positions:
+    plot_payoff(spot, strike, position)
+    plot_greeks(spot, strike, taux, maturite, volatilite, position)
