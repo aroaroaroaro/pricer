@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from scipy.stats import norm
 import streamlit as st
 import io
-import zipfile
 
 def black_scholes(spot, strike, taux, maturite, volatilite, option_type='call'):
     # Conversion de la maturité en années
@@ -59,7 +58,13 @@ def plot_payoff(spot, strike, position):
     buf = io.BytesIO()
     plt.savefig(buf, format='png')
     buf.seek(0)
-    return buf
+    st.download_button(
+        label=f"Télécharger le graphique {position} Payoff",
+        data=buf,
+        file_name=f"{position}_payoff.png",
+        mime="image/png"
+    )
+    st.pyplot(plt)
 
 def plot_greeks(spot, strike, taux, maturite, volatilite, position):
     spot_range = np.linspace(spot * 0.5, spot * 1.5, 500)
@@ -131,7 +136,13 @@ def plot_greeks(spot, strike, taux, maturite, volatilite, position):
     buf = io.BytesIO()
     plt.savefig(buf, format='png')
     buf.seek(0)
-    return buf
+    st.download_button(
+        label=f"Télécharger le graphique {position} Greeks",
+        data=buf,
+        file_name=f"{position}_greeks.png",
+        mime="image/png"
+    )
+    st.pyplot(plt)
 
 # Interface utilisateur avec Streamlit
 st.title("Option Pricing avec Black-Scholes")
@@ -146,30 +157,17 @@ if st.button("Calculer"):
     df_results = calculate_options(spot, strike, taux, maturite, volatilite)
     st.write(df_results)
 
-    positions = ['Call', 'Put']
-    buffers = {}
+    # Bouton pour télécharger les résultats en CSV
+    csv = df_results.to_csv(index=False)
+    st.download_button(
+        label="Télécharger les résultats en CSV",
+        data=csv,
+        file_name="option_pricing_results.csv",
+        mime="text/csv"
+    )
 
+    positions = ['Call', 'Put']
     for position in positions:
         st.write(f"### {position}")
-        buffers[f"{position}_payoff.png"] = plot_payoff(spot, strike, position)
-        buffers[f"{position}_greeks.png"] = plot_greeks(spot, strike, taux, maturite, volatilite, position)
-        st.pyplot(plt)
-
-    # Création d'un fichier ZIP contenant les résultats et les graphiques
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        # Ajouter le fichier CSV des résultats
-        csv = df_results.to_csv(index=False)
-        zip_file.writestr("option_pricing_results.csv", csv)
-
-        # Ajouter les graphiques
-        for file_name, buf in buffers.items():
-            zip_file.writestr(file_name, buf.getvalue())
-
-    zip_buffer.seek(0)
-    st.download_button(
-        label="Télécharger tous les résultats",
-        data=zip_buffer,
-        file_name="option_pricing_results.zip",
-        mime="application/zip"
-    )
+        plot_payoff(spot, strike, position)
+        plot_greeks(spot, strike, taux, maturite, volatilite, position)
