@@ -5,7 +5,6 @@ from scipy.stats import norm
 import streamlit as st
 import io
 import zipfile
-from datetime import datetime, timedelta
 
 def black_scholes(spot, strike, taux, maturite, volatilite, option_type='call'):
     # Conversion de la maturité en années
@@ -126,49 +125,41 @@ st.title("Option Pricing avec Black-Scholes")
 spot = st.number_input("Spot Price", value=200.0)
 strike = st.number_input("Strike Price", value=200.0)
 taux = st.number_input("Taux sans risque (annuel)", value=0.05)
+maturite = st.number_input("Maturité (en jours)", value=30)
 volatilite = st.number_input("Volatilité (annuelle)", value=0.2)
 
-# Sélection de la date de maturité via un calendrier
-today = datetime.today()
-maturite_date = st.date_input("Date de Maturité", value=today + timedelta(days=30), min_value=today + timedelta(days=1))
-
 if st.button("Calculer"):
-    # Vérification que la date de maturité est bien sélectionnée
-    if isinstance(maturite_date, datetime.date):
-        maturite = (maturite_date - today).days
-        df_results = calculate_options(spot, strike, taux, maturite, volatilite)
-        st.write(df_results)
+    df_results = calculate_options(spot, strike, taux, maturite, volatilite)
+    st.write(df_results)
 
-        positions = ['Call', 'Put']
-        buffers = {}
+    positions = ['Call', 'Put']
+    buffers = {}
 
-        for position in positions:
-            st.write(f"### {position}")
-            buf_payoff = plot_payoff(spot, strike, position)
-            buf_greeks = plot_greeks(spot, strike, taux, maturite, volatilite, position)
-            buffers[f"{position}_payoff.png"] = buf_payoff
-            buffers[f"{position}_greeks.png"] = buf_greeks
+    for position in positions:
+        st.write(f"### {position}")
+        buf_payoff = plot_payoff(spot, strike, position)
+        buf_greeks = plot_greeks(spot, strike, taux, maturite, volatilite, position)
+        buffers[f"{position}_payoff.png"] = buf_payoff
+        buffers[f"{position}_greeks.png"] = buf_greeks
 
-            # Afficher les graphiques dans l'application
-            st.pyplot(plt)
+        # Afficher les graphiques dans l'application
+        st.pyplot(plt)
 
-        # Création d'un fichier ZIP contenant les résultats et les graphiques
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            # Ajouter le fichier CSV des résultats
-            csv = df_results.to_csv(index=False)
-            zip_file.writestr("option_pricing_results.csv", csv)
+    # Création d'un fichier ZIP contenant les résultats et les graphiques
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # Ajouter le fichier CSV des résultats
+        csv = df_results.to_csv(index=False)
+        zip_file.writestr("option_pricing_results.csv", csv)
 
-            # Ajouter les graphiques
-            for file_name, buf in buffers.items():
-                zip_file.writestr(file_name, buf.getvalue())
+        # Ajouter les graphiques
+        for file_name, buf in buffers.items():
+            zip_file.writestr(file_name, buf.getvalue())
 
-        zip_buffer.seek(0)
-        st.download_button(
-            label="Télécharger tous les résultats",
-            data=zip_buffer,
-            file_name="option_pricing_results.zip",
-            mime="application/zip"
-        )
-    else:
-        st.error("Veuillez sélectionner une date de maturité valide.")
+    zip_buffer.seek(0)
+    st.download_button(
+        label="Télécharger tous les résultats",
+        data=zip_buffer,
+        file_name="option_pricing_results.zip",
+        mime="application/zip"
+    )
