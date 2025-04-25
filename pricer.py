@@ -3,8 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 import streamlit as st
-import io
-import zipfile
 
 def black_scholes(spot, strike, taux, maturite, volatilite, option_type='call'):
     # Conversion de la maturité en années
@@ -54,16 +52,11 @@ def plot_payoff(spot, strike, position):
     plt.title(f'{position} Payoff')
     plt.legend()
     plt.grid(True)
-
-    # Sauvegarde du graphique dans un buffer
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png')
-    buf.seek(0)
-    plt.close()  # Fermer la figure pour éviter les conflits
-    return buf
+    st.pyplot(plt)
 
 def plot_greeks(spot, strike, taux, maturite, volatilite, position):
     spot_range = np.linspace(spot * 0.5, spot * 1.5, 500)
+    prices = []
     deltas = []
     gammas = []
     vegas = []
@@ -73,7 +66,8 @@ def plot_greeks(spot, strike, taux, maturite, volatilite, position):
     option_type = 'call' if position == 'Call' else 'put'
 
     for s in spot_range:
-        _, delta, gamma, vega, theta, rho = black_scholes(s, strike, taux, maturite, volatilite, option_type)
+        price, delta, gamma, vega, theta, rho = black_scholes(s, strike, taux, maturite, volatilite, option_type)
+        prices.append(price)
         deltas.append(delta)
         gammas.append(gamma)
         vegas.append(vega)
@@ -82,42 +76,50 @@ def plot_greeks(spot, strike, taux, maturite, volatilite, position):
 
     plt.figure(figsize=(12, 10))
 
-    plt.subplot(2, 2, 1)
+    plt.subplot(3, 2, 1)
+    plt.plot(spot_range, prices, label=f'{position} Price')
+    plt.xlabel('Spot Price')
+    plt.ylabel('Price')
+    plt.title(f'{position} Price')
+    plt.grid(True)
+
+    plt.subplot(3, 2, 2)
     plt.plot(spot_range, deltas, label=f'{position} Delta')
     plt.xlabel('Spot Price')
     plt.ylabel('Delta')
     plt.title(f'{position} Delta')
     plt.grid(True)
 
-    plt.subplot(2, 2, 2)
+    plt.subplot(3, 2, 3)
     plt.plot(spot_range, gammas, label=f'{position} Gamma')
     plt.xlabel('Spot Price')
     plt.ylabel('Gamma')
     plt.title(f'{position} Gamma')
     plt.grid(True)
 
-    plt.subplot(2, 2, 3)
+    plt.subplot(3, 2, 4)
     plt.plot(spot_range, vegas, label=f'{position} Vega')
     plt.xlabel('Spot Price')
     plt.ylabel('Vega')
     plt.title(f'{position} Vega')
     plt.grid(True)
 
-    plt.subplot(2, 2, 4)
+    plt.subplot(3, 2, 5)
     plt.plot(spot_range, thetas, label=f'{position} Theta')
     plt.xlabel('Spot Price')
     plt.ylabel('Theta')
     plt.title(f'{position} Theta')
     plt.grid(True)
 
-    plt.tight_layout()
+    plt.subplot(3, 2, 6)
+    plt.plot(spot_range, rhos, label=f'{position} Rho')
+    plt.xlabel('Spot Price')
+    plt.ylabel('Rho')
+    plt.title(f'{position} Rho')
+    plt.grid(True)
 
-    # Sauvegarde du graphique dans un buffer
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png')
-    buf.seek(0)
-    plt.close()  # Fermer la figure pour éviter les conflits
-    return buf
+    plt.tight_layout()
+    st.pyplot(plt)
 
 # Interface utilisateur avec Streamlit
 st.title("Option Pricing avec Black-Scholes")
@@ -133,33 +135,7 @@ if st.button("Calculer"):
     st.write(df_results)
 
     positions = ['Call', 'Put']
-    buffers = {}
-
     for position in positions:
         st.write(f"### {position}")
-        buf_payoff = plot_payoff(spot, strike, position)
-        buf_greeks = plot_greeks(spot, strike, taux, maturite, volatilite, position)
-        buffers[f"{position}_payoff.png"] = buf_payoff
-        buffers[f"{position}_greeks.png"] = buf_greeks
-
-        # Afficher les graphiques dans l'application
-        st.pyplot(plt)
-
-    # Création d'un fichier ZIP contenant les résultats et les graphiques
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        # Ajouter le fichier CSV des résultats
-        csv = df_results.to_csv(index=False)
-        zip_file.writestr("option_pricing_results.csv", csv)
-
-        # Ajouter les graphiques
-        for file_name, buf in buffers.items():
-            zip_file.writestr(file_name, buf.getvalue())
-
-    zip_buffer.seek(0)
-    st.download_button(
-        label="Télécharger tous les résultats",
-        data=zip_buffer,
-        file_name="option_pricing_results.zip",
-        mime="application/zip"
-    )
+        plot_payoff(spot, strike, position)
+        plot_greeks(spot, strike, taux, maturite, volatilite, position)
