@@ -8,10 +8,7 @@ import zipfile
 from datetime import datetime, timedelta
 
 def black_scholes(spot, strike, taux, maturite, volatilite, dividende, option_type='call'):
-    # Conversion de la maturité en années
     T = maturite / 365.0
-
-    # Calcul des paramètres intermédiaires
     d1 = (np.log(spot / strike) + (taux - dividende + 0.5 * volatilite**2) * T) / (volatilite * np.sqrt(T))
     d2 = d1 - volatilite * np.sqrt(T)
 
@@ -56,21 +53,15 @@ def plot_payoff(spot, strike, position):
     plt.legend()
     plt.grid(True)
 
-    # Sauvegarde du graphique dans un buffer
     buf = io.BytesIO()
     plt.savefig(buf, format='png')
     buf.seek(0)
-    plt.close()  # Fermer la figure pour éviter les conflits
+    plt.close()
     return buf
 
 def plot_greeks(spot, strike, taux, maturite, volatilite, dividende, position):
     spot_range = np.linspace(spot * 0.5, spot * 1.5, 500)
-    prices = []
-    deltas = []
-    gammas = []
-    vegas = []
-    thetas = []
-    rhos = []
+    prices, deltas, gammas, vegas, thetas, rhos = [], [], [], [], [], []
 
     option_type = 'call' if position == 'Call' else 'put'
 
@@ -86,57 +77,44 @@ def plot_greeks(spot, strike, taux, maturite, volatilite, dividende, position):
     plt.figure(figsize=(12, 10))
 
     plt.subplot(3, 2, 1)
-    plt.plot(spot_range, prices, label=f'{position} Price')
-    plt.xlabel('Spot Price')
-    plt.ylabel('Price')
+    plt.plot(spot_range, prices)
     plt.title(f'{position} Price')
     plt.grid(True)
 
     plt.subplot(3, 2, 2)
-    plt.plot(spot_range, deltas, label=f'{position} Delta')
-    plt.xlabel('Spot Price')
-    plt.ylabel('Delta')
+    plt.plot(spot_range, deltas)
     plt.title(f'{position} Delta')
     plt.grid(True)
 
     plt.subplot(3, 2, 3)
-    plt.plot(spot_range, gammas, label=f'{position} Gamma')
-    plt.xlabel('Spot Price')
-    plt.ylabel('Gamma')
+    plt.plot(spot_range, gammas)
     plt.title(f'{position} Gamma')
     plt.grid(True)
 
     plt.subplot(3, 2, 4)
-    plt.plot(spot_range, vegas, label=f'{position} Vega')
-    plt.xlabel('Spot Price')
-    plt.ylabel('Vega')
+    plt.plot(spot_range, vegas)
     plt.title(f'{position} Vega')
     plt.grid(True)
 
     plt.subplot(3, 2, 5)
-    plt.plot(spot_range, thetas, label=f'{position} Theta')
-    plt.xlabel('Spot Price')
-    plt.ylabel('Theta')
+    plt.plot(spot_range, thetas)
     plt.title(f'{position} Theta')
     plt.grid(True)
 
     plt.subplot(3, 2, 6)
-    plt.plot(spot_range, rhos, label=f'{position} Rho')
-    plt.xlabel('Spot Price')
-    plt.ylabel('Rho')
+    plt.plot(spot_range, rhos)
     plt.title(f'{position} Rho')
     plt.grid(True)
 
     plt.tight_layout()
 
-    # Sauvegarde du graphique dans un buffer
     buf = io.BytesIO()
     plt.savefig(buf, format='png')
     buf.seek(0)
-    plt.close()  # Fermer la figure pour éviter les conflits
+    plt.close()
     return buf
 
-# Interface utilisateur avec Streamlit
+# Interface Streamlit
 st.title("Option Pricing avec Black-Scholes")
 
 spot = st.number_input("Spot Price", value=200.0)
@@ -145,8 +123,8 @@ taux = st.number_input("Taux sans risque (annuel)", value=0.05)
 volatilite = st.number_input("Volatilité (annuelle)", value=0.2)
 dividende = st.number_input("Dividende (annuel)", value=0.0)
 
-# Sélection de la date de maturité via un calendrier
-today = datetime.today()
+# ✅ Correction ici
+today = datetime.today().date()
 maturite_date = st.date_input("Date de Maturité", value=today + timedelta(days=30), min_value=today + timedelta(days=1))
 maturite = (maturite_date - today).days
 
@@ -161,16 +139,12 @@ if st.button("Calculer"):
         st.write(f"### {position}")
         buffers[f"{position}_payoff.png"] = plot_payoff(spot, strike, position)
         buffers[f"{position}_greeks.png"] = plot_greeks(spot, strike, taux, maturite, volatilite, dividende, position)
-        st.pyplot(plt)  # Afficher le graphique dans l'application
+        st.pyplot(plt)
 
-    # Création d'un fichier ZIP contenant les résultats et les graphiques
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        # Ajouter le fichier CSV des résultats
         csv = df_results.to_csv(index=False)
         zip_file.writestr("option_pricing_results.csv", csv)
-
-        # Ajouter les graphiques
         for file_name, buf in buffers.items():
             zip_file.writestr(file_name, buf.getvalue())
 
