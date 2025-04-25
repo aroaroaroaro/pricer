@@ -27,16 +27,12 @@ def black_scholes(spot, strike, taux, maturite, volatilite, option_type='call'):
     return price, delta, gamma, vega, theta, rho
 
 def calculate_options(spot, strike, taux, maturite, volatilite):
-    positions = ['Long Call', 'Long Put', 'Short Call', 'Short Put']
+    positions = ['Call', 'Put']
     results = []
 
     for position in positions:
-        option_type = 'call' if 'Call' in position else 'put'
+        option_type = 'call' if position == 'Call' else 'put'
         price, delta, gamma, vega, theta, rho = black_scholes(spot, strike, taux, maturite, volatilite, option_type)
-
-        if 'Short' in position:
-            price, delta, gamma, vega, theta, rho = -price, -delta, gamma, vega, -theta, -rho
-
         results.append([position, price, delta, gamma, vega, theta, rho])
 
     df_results = pd.DataFrame(results, columns=['Position', 'Price', 'Delta', 'Gamma', 'Vega', 'Theta', 'Rho'])
@@ -44,13 +40,10 @@ def calculate_options(spot, strike, taux, maturite, volatilite):
 
 def plot_payoff(spot, strike, position):
     spot_range = np.linspace(spot * 0.5, spot * 1.5, 500)
-    if 'Call' in position:
+    if position == 'Call':
         payoff = np.maximum(spot_range - strike, 0)
-    elif 'Put' in position:
+    elif position == 'Put':
         payoff = np.maximum(strike - spot_range, 0)
-
-    if 'Short' in position:
-        payoff = -payoff
 
     plt.figure(figsize=(10, 6))
     plt.plot(spot_range, payoff, label=f'{position} Payoff')
@@ -70,13 +63,10 @@ def plot_greeks(spot, strike, taux, maturite, volatilite, position):
     thetas = []
     rhos = []
 
-    option_type = 'call' if 'Call' in position else 'put'
+    option_type = 'call' if position == 'Call' else 'put'
 
     for s in spot_range:
         price, delta, gamma, vega, theta, rho = black_scholes(s, strike, taux, maturite, volatilite, option_type)
-        if 'Short' in position:
-            price, delta, theta, rho = -price, -delta, -theta, -rho
-
         prices.append(price)
         deltas.append(delta)
         gammas.append(gamma)
@@ -144,7 +134,7 @@ if st.button("Calculer"):
     df_results = calculate_options(spot, strike, taux, maturite, volatilite)
     st.write(df_results)
 
-    positions = ['Long Call', 'Long Put', 'Short Call', 'Short Put']
+    positions = ['Call', 'Put']
     for position in positions:
         st.write(f"### {position}")
         plot_payoff(spot, strike, position)
