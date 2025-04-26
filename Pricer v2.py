@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import random
 import math
+import io
+import zipfile
 
 # Inclure toutes les fonctions de votre code ici...
 
@@ -104,20 +106,29 @@ def option_pricer(S, K, T, r, sigma=None, market_price=None, option_type='call',
 
     return price
 
-def calculate_options(spot, strike, taux, maturite, volatilite):
+def calculate_options_and_greeks(spot, strike, taux, maturite, volatilite):
     positions = ['Long Call', 'Long Put', 'Short Call', 'Short Put']
     results = []
 
     for position in positions:
         option_type = 'call' if 'Call' in position else 'put'
-        price = option_pricer(spot, strike, maturite / 365.0, taux, volatilite, option_type=option_type)
+        T = maturite / 365.0
+        price = option_pricer(spot, strike, T, taux, volatilite, option_type=option_type)
+        d1 = (math.log(spot / strike) + (taux + 0.5 * volatilite**2) * T) / (volatilite * math.sqrt(T))
+        d2 = d1 - volatilite * math.sqrt(T)
+
+        delta = black_scholes_delta(spot, strike, T, taux, volatilite, option_type)
+        gamma = black_scholes_gamma(spot, strike, T, taux, volatilite)
+        vega = black_scholes_vega(spot, strike, T, taux, volatilite)
+        theta = black_scholes_theta(spot, strike, T, taux, volatilite, option_type)
+        rho = black_scholes_rho(spot, strike, T, taux, volatilite, option_type)
 
         if 'Short' in position:
             price = -price
 
-        results.append([position, price])
+        results.append([position, price, delta, gamma, vega, theta, rho])
 
-    df_results = pd.DataFrame(results, columns=['Position', 'Price'])
+    df_results = pd.DataFrame(results, columns=['Position', 'Price', 'Delta', 'Gamma', 'Vega', 'Theta', 'Rho'])
     return df_results
 
 def plot_payoff(spot, strike, position):
@@ -137,7 +148,7 @@ def plot_payoff(spot, strike, position):
     plt.title(f'{position} Payoff')
     plt.legend()
     plt.grid(True)
-    st.pyplot(plt)
+    return plt
 
 def plot_greeks_3d(spot, strike, taux, maturite, volatilite, position):
     spot_range = np.linspace(spot * 0.5, spot * 1.5, 50)
@@ -214,6 +225,35 @@ def plot_3d_surface(X, Y, Z, title):
     ax.set_title(f'3D Surface Plot of {title}')
     fig.colorbar(surf)
     st.pyplot(fig)
+    return fig
+
+def export_data(df, payoff_plot, greeks_plots, filename):
+    csv = df.to_csv(index=False)
+    zip_buffer = io.BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED) as zip_file:
+        zip_file.writestr("data.csv", csv)
+
+        # Save payoff plot
+        payoff_buf = io.BytesIO()
+        payoff_plot.savefig(payoff_buf, format='png')
+        payoff_buf.seek(0)
+        zip_file.writestr("payoff_plot.png", payoff_buf.getvalue())
+
+        # Save greeks plots
+        for i, plot in enumerate(greeks_plots):
+            greek_buf = io.BytesIO()
+            plot.savefig(greek_buf, format='png')
+            greek_buf.seek(0)
+            zip_file.writestr(f"greeks_plot_{i}.png", greek_buf.getvalue())
+
+    zip_buffer.seek(0)
+    st.download_button(
+        label="Download data as ZIP",
+        data=zip_buffer,
+        file_name=filename,
+        mime="application/zip"
+    )
 
 def main():
     st.title("Option Pricing and Visualization")
@@ -226,28 +266,38 @@ def main():
     volatilite = st.number_input("Volatility", value=0.2)
 
     # Onglets
-    tab1, tab2, tab3 = st.tabs(["Calculate Option Prices", "Payoff Visualization", "Greeks Visualization"])
+    tab1, tab2, tab3 = st.tabs(["Calculate Option Prices and Greeks", "Payoff Visualization", "Greeks Visualization"])
 
     with tab1:
-        st.header("Calculate Option Prices")
-        st.write("Calculate the prices for different option positions.")
+        st.header("Calculate Option Prices and Greeks")
+        st.write("Calculate the prices and Greeks for different option positions.")
         if st.button("Calculate"):
-            df_results = calculate_options(spot, strike, taux, maturite, volatilite)
+            df_results = calculate_options_and_greeks(spot, strike, taux, maturite, volatilite)
             st.write(df_results)
+            export_data(df_results, None, [], 'option_prices_and_greeks.zip')
 
     with tab2:
         st.header("Payoff Visualization")
         st.write("Visualize the payoff for different option positions.")
         position = st.selectbox("Select Position", ['Long Call', 'Long Put', 'Short Call', 'Short Put'])
         if st.button("Plot Payoff"):
-            plot_payoff(spot, strike, position)
+            payoff_plot = plot_payoff(spot, strike, position)
+            st.pyplot(payoff_plot)
+            export_data(pd.DataFrame(), payoff_plot, [], 'payoff_plot.zip')
 
     with tab3:
         st.header("Greeks Visualization")
         st.write("Visualize the Greeks for different option positions.")
         position = st.selectbox("Select Position", ['Long Call', 'Long Put', 'Short Call', 'Short Put'], key="greeks")
         if st.button("Plot Greeks"):
+            greeks_plots = []
             plot_greeks_3d(spot, strike, taux, maturite, volatilite, position)
+            greeks_plots.append(plot_3d_surface(np.linspace(spot * 0.5, spot * 1.5, 50), np.linspace(0.01, maturite / 365.0, 50), np.zeros((50, 50)), f'Delta ({position})'))
+            greeks_plots.append(plot_3d_surface(np.linspace(spot * 0.5, spot * 1.5, 50), np.linspace(0.01, maturite / 365.0, 50), np.zeros((50, 50)), f'Gamma ({position})'))
+            greeks_plots.append(plot_3d_surface(np.linspace(spot * 0.5, spot * 1.5, 50), np.linspace(0.01, maturite / 365.0, 50), np.zeros((50, 50)), f'Vega ({position})'))
+            greeks_plots.append(plot_3d_surface(np.linspace(spot * 0.5, spot * 1.5, 50), np.linspace(0.01, maturite / 365.0, 50), np.zeros((50, 50)), f'Theta ({position})'))
+            greeks_plots.append(plot_3d_surface(np.linspace(spot * 0.5, spot * 1.5, 50), np.linspace(0.01, maturite / 365.0, 50), np.zeros((50, 50)), f'Rho ({position})'))
+            export_data(pd.DataFrame(), None, greeks_plots, 'greeks_plots.zip')
 
 if __name__ == "__main__":
     main()
