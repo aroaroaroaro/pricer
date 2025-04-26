@@ -229,8 +229,15 @@ def plot_3d_surface(X, Y, Z, title):
     st.pyplot(fig)
     return fig
 
-def export_data(df, payoff_plot=None, greeks_plots=None, filename='export.zip'):
-    csv = df.to_csv(index=False)
+def export_data(inputs, df_results, payoff_plot=None, greeks_plots=None, filename='export.zip'):
+    # Create a DataFrame for inputs
+    df_inputs = pd.DataFrame(inputs, index=['Value'])
+
+    # Combine inputs and results into a single DataFrame
+    df_combined = pd.concat([df_inputs, df_results], axis=1)
+
+    # Save the combined DataFrame to CSV
+    csv = df_combined.to_csv(index=False)
     zip_buffer = io.BytesIO()
 
     with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED) as zip_file:
@@ -253,7 +260,7 @@ def export_data(df, payoff_plot=None, greeks_plots=None, filename='export.zip'):
 
     zip_buffer.seek(0)
     st.download_button(
-        label="Download data as ZIP",
+        label="Download all data as ZIP",
         data=zip_buffer,
         file_name=filename,
         mime="application/zip"
@@ -270,7 +277,13 @@ def main():
     volatilite = st.number_input("Volatility", value=0.2)
 
     # Onglets
-    tab1, tab2, tab3 = st.tabs(["Calculate Option Prices and Greeks", "Payoff Visualization", "Greeks Visualization"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Calculate Option Prices and Greeks", "Payoff Visualization", "Greeks Visualization", "Export Data"])
+
+    # Variables globales pour stocker les résultats et les graphiques
+    global df_results, payoff_plot, greeks_plots
+    df_results = pd.DataFrame()
+    payoff_plot = None
+    greeks_plots = []
 
     with tab1:
         st.header("Calculate Option Prices and Greeks")
@@ -278,7 +291,6 @@ def main():
         if st.button("Calculate"):
             df_results = calculate_options_and_greeks(spot, strike, taux, maturite, volatilite)
             st.write(df_results)
-            export_data(df_results, filename='option_prices_and_greeks.zip')
 
     with tab2:
         st.header("Payoff Visualization")
@@ -287,7 +299,6 @@ def main():
         if st.button("Plot Payoff"):
             payoff_plot = plot_payoff(spot, strike, position)
             st.pyplot(payoff_plot)
-            export_data(pd.DataFrame(), payoff_plot=payoff_plot, filename='payoff_plot.zip')
 
     with tab3:
         st.header("Greeks Visualization")
@@ -295,7 +306,19 @@ def main():
         position = st.selectbox("Select Position", ['Long Call', 'Long Put', 'Short Call', 'Short Put'], key="greeks")
         if st.button("Plot Greeks"):
             greeks_plots = plot_greeks_3d(spot, strike, taux, maturite, volatilite, position)
-            export_data(pd.DataFrame(), greeks_plots=greeks_plots, filename='greeks_plots.zip')
+
+    with tab4:
+        st.header("Export Data")
+        st.write("Download all inputs, results, and plots as a ZIP file.")
+        inputs = {
+            'Spot Price': spot,
+            'Strike Price': strike,
+            'Interest Rate': taux,
+            'Maturity (days)': maturite,
+            'Volatility': volatilite
+        }
+        if st.button("Export Data"):
+            export_data(inputs, df_results, payoff_plot, greeks_plots, 'export.zip')
 
 if __name__ == "__main__":
     main()
