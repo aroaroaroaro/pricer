@@ -1,9 +1,12 @@
+import streamlit as st
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import random
 import math
+
+# Inclure toutes les fonctions de votre code ici...
 
 def generate_normal_random():
     """Génère un nombre aléatoire suivant une distribution normale standard."""
@@ -134,7 +137,7 @@ def plot_payoff(spot, strike, position):
     plt.title(f'{position} Payoff')
     plt.legend()
     plt.grid(True)
-    plt.show()
+    st.pyplot(plt)
 
 def plot_greeks_3d(spot, strike, taux, maturite, volatilite, position):
     spot_range = np.linspace(spot * 0.5, spot * 1.5, 50)
@@ -210,20 +213,41 @@ def plot_3d_surface(X, Y, Z, title):
     ax.set_zlabel(title)
     ax.set_title(f'3D Surface Plot of {title}')
     fig.colorbar(surf)
-    plt.show()
+    st.pyplot(fig)
 
-# Paramètres
-spot = 100
-strike = 100
-taux = 0.05
-maturite = 30  # en jours
-volatilite = 0.2
+def main():
+    st.title("Option Pricing and Visualization")
 
-# Exemple d'utilisation
-df_results = calculate_options(spot, strike, taux, maturite, volatilite)
-print(df_results)
+    # Paramètres par défaut
+    spot = st.number_input("Spot Price", value=100.0)
+    strike = st.number_input("Strike Price", value=100.0)
+    taux = st.number_input("Interest Rate", value=0.05)
+    maturite = st.number_input("Maturity (days)", value=30)
+    volatilite = st.number_input("Volatility", value=0.2)
 
-positions = ['Long Call', 'Long Put', 'Short Call', 'Short Put']
-for position in positions:
-    plot_payoff(spot, strike, position)
-    plot_greeks_3d(spot, strike, taux, maturite, volatilite, position)
+    # Onglets
+    tab1, tab2, tab3 = st.tabs(["Calculate Option Prices", "Payoff Visualization", "Greeks Visualization"])
+
+    with tab1:
+        st.header("Calculate Option Prices")
+        st.write("Calculate the prices for different option positions.")
+        if st.button("Calculate"):
+            df_results = calculate_options(spot, strike, taux, maturite, volatilite)
+            st.write(df_results)
+
+    with tab2:
+        st.header("Payoff Visualization")
+        st.write("Visualize the payoff for different option positions.")
+        position = st.selectbox("Select Position", ['Long Call', 'Long Put', 'Short Call', 'Short Put'])
+        if st.button("Plot Payoff"):
+            plot_payoff(spot, strike, position)
+
+    with tab3:
+        st.header("Greeks Visualization")
+        st.write("Visualize the Greeks for different option positions.")
+        position = st.selectbox("Select Position", ['Long Call', 'Long Put', 'Short Call', 'Short Put'], key="greeks")
+        if st.button("Plot Greeks"):
+            plot_greeks_3d(spot, strike, taux, maturite, volatilite, position)
+
+if __name__ == "__main__":
+    main()
