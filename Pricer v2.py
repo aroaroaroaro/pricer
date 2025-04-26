@@ -170,11 +170,13 @@ def plot_greeks_3d(spot, strike, taux, maturite, volatilite, position):
             theta[i, j] = black_scholes_theta(S, strike, T, taux, volatilite, option_type)
             rho[i, j] = black_scholes_rho(S, strike, T, taux, volatilite, option_type)
 
-    plot_3d_surface(spot_range, time_range, delta, f'Delta ({position})')
-    plot_3d_surface(spot_range, time_range, gamma, f'Gamma ({position})')
-    plot_3d_surface(spot_range, time_range, vega, f'Vega ({position})')
-    plot_3d_surface(spot_range, time_range, theta, f'Theta ({position})')
-    plot_3d_surface(spot_range, time_range, rho, f'Rho ({position})')
+    plots = []
+    plots.append(plot_3d_surface(spot_range, time_range, delta, f'Delta ({position})'))
+    plots.append(plot_3d_surface(spot_range, time_range, gamma, f'Gamma ({position})'))
+    plots.append(plot_3d_surface(spot_range, time_range, vega, f'Vega ({position})'))
+    plots.append(plot_3d_surface(spot_range, time_range, theta, f'Theta ({position})'))
+    plots.append(plot_3d_surface(spot_range, time_range, rho, f'Rho ({position})'))
+    return plots
 
 def black_scholes_delta(S, K, T, r, sigma, option_type='call'):
     d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
@@ -227,25 +229,27 @@ def plot_3d_surface(X, Y, Z, title):
     st.pyplot(fig)
     return fig
 
-def export_data(df, payoff_plot, greeks_plots, filename):
+def export_data(df, payoff_plot=None, greeks_plots=None, filename='export.zip'):
     csv = df.to_csv(index=False)
     zip_buffer = io.BytesIO()
 
     with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED) as zip_file:
         zip_file.writestr("data.csv", csv)
 
-        # Save payoff plot
-        payoff_buf = io.BytesIO()
-        payoff_plot.savefig(payoff_buf, format='png')
-        payoff_buf.seek(0)
-        zip_file.writestr("payoff_plot.png", payoff_buf.getvalue())
+        # Save payoff plot if provided
+        if payoff_plot:
+            payoff_buf = io.BytesIO()
+            payoff_plot.savefig(payoff_buf, format='png')
+            payoff_buf.seek(0)
+            zip_file.writestr("payoff_plot.png", payoff_buf.getvalue())
 
-        # Save greeks plots
-        for i, plot in enumerate(greeks_plots):
-            greek_buf = io.BytesIO()
-            plot.savefig(greek_buf, format='png')
-            greek_buf.seek(0)
-            zip_file.writestr(f"greeks_plot_{i}.png", greek_buf.getvalue())
+        # Save greeks plots if provided
+        if greeks_plots:
+            for i, plot in enumerate(greeks_plots):
+                greek_buf = io.BytesIO()
+                plot.savefig(greek_buf, format='png')
+                greek_buf.seek(0)
+                zip_file.writestr(f"greeks_plot_{i}.png", greek_buf.getvalue())
 
     zip_buffer.seek(0)
     st.download_button(
@@ -274,7 +278,7 @@ def main():
         if st.button("Calculate"):
             df_results = calculate_options_and_greeks(spot, strike, taux, maturite, volatilite)
             st.write(df_results)
-            export_data(df_results, None, [], 'option_prices_and_greeks.zip')
+            export_data(df_results, filename='option_prices_and_greeks.zip')
 
     with tab2:
         st.header("Payoff Visualization")
@@ -283,21 +287,15 @@ def main():
         if st.button("Plot Payoff"):
             payoff_plot = plot_payoff(spot, strike, position)
             st.pyplot(payoff_plot)
-            export_data(pd.DataFrame(), payoff_plot, [], 'payoff_plot.zip')
+            export_data(pd.DataFrame(), payoff_plot=payoff_plot, filename='payoff_plot.zip')
 
     with tab3:
         st.header("Greeks Visualization")
         st.write("Visualize the Greeks for different option positions.")
         position = st.selectbox("Select Position", ['Long Call', 'Long Put', 'Short Call', 'Short Put'], key="greeks")
         if st.button("Plot Greeks"):
-            greeks_plots = []
-            plot_greeks_3d(spot, strike, taux, maturite, volatilite, position)
-            greeks_plots.append(plot_3d_surface(np.linspace(spot * 0.5, spot * 1.5, 50), np.linspace(0.01, maturite / 365.0, 50), np.zeros((50, 50)), f'Delta ({position})'))
-            greeks_plots.append(plot_3d_surface(np.linspace(spot * 0.5, spot * 1.5, 50), np.linspace(0.01, maturite / 365.0, 50), np.zeros((50, 50)), f'Gamma ({position})'))
-            greeks_plots.append(plot_3d_surface(np.linspace(spot * 0.5, spot * 1.5, 50), np.linspace(0.01, maturite / 365.0, 50), np.zeros((50, 50)), f'Vega ({position})'))
-            greeks_plots.append(plot_3d_surface(np.linspace(spot * 0.5, spot * 1.5, 50), np.linspace(0.01, maturite / 365.0, 50), np.zeros((50, 50)), f'Theta ({position})'))
-            greeks_plots.append(plot_3d_surface(np.linspace(spot * 0.5, spot * 1.5, 50), np.linspace(0.01, maturite / 365.0, 50), np.zeros((50, 50)), f'Rho ({position})'))
-            export_data(pd.DataFrame(), None, greeks_plots, 'greeks_plots.zip')
+            greeks_plots = plot_greeks_3d(spot, strike, taux, maturite, volatilite, position)
+            export_data(pd.DataFrame(), greeks_plots=greeks_plots, filename='greeks_plots.zip')
 
 if __name__ == "__main__":
     main()
