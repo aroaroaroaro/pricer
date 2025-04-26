@@ -233,15 +233,17 @@ def export_data(inputs, df_results, payoff_plot=None, greeks_plots=None, filenam
     # Create a DataFrame for inputs
     df_inputs = pd.DataFrame(inputs, index=['Value'])
 
-    # Combine inputs and results into a single DataFrame
-    df_combined = pd.concat([df_inputs, df_results], axis=1)
+    # Save inputs to CSV
+    inputs_csv = df_inputs.to_csv(index=False)
 
-    # Save the combined DataFrame to CSV
-    csv = df_combined.to_csv(index=False)
+    # Save results to CSV
+    results_csv = df_results.to_csv(index=False)
+
     zip_buffer = io.BytesIO()
 
     with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED) as zip_file:
-        zip_file.writestr("data.csv", csv)
+        zip_file.writestr("inputs.csv", inputs_csv)
+        zip_file.writestr("results.csv", results_csv)
 
         # Save payoff plot if provided
         if payoff_plot:
