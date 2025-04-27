@@ -113,6 +113,15 @@ def monte_carlo_pricer(S, K, T, r, sigma, option_type='call', num_simulations=10
     price = discount_factor * np.mean(payoffs)
     return price
 
+# Fonction pour calculer le prix Black-Scholes
+def black_scholes_price(S, K, T, r, sigma, option_type='call'):
+    d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+    if option_type == 'call':
+        return S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
+    else:
+        return K * np.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
+
 # --- App Streamlit ---
 st.title("Pricer d'option")
 
@@ -147,7 +156,7 @@ with tabs[0]:
             rho = sign * black_scholes_rho(spot, strike, maturite / 365, taux, volatilite, 'call' if "Call" in position else 'put')
 
             if option_type == 'Européenne':
-                bs_price = sign * (spot * norm.cdf(delta) - strike * np.exp(-taux * maturite / 365) * norm.cdf(delta - sigma * np.sqrt(maturite / 365)))
+                bs_price = sign * black_scholes_price(spot, strike, maturite / 365, taux, volatilite, 'call' if "Call" in position else 'put')
                 mc_price = sign * monte_carlo_pricer(spot, strike, maturite / 365, taux, volatilite, 'call' if "Call" in position else 'put')
                 data.append([position, bs_price, mc_price, delta, gamma, vega, theta, rho])
             else:
