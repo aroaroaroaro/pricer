@@ -21,6 +21,16 @@ def geometric_brownian_motion(S0, mu, sigma, T, dt, steps):
         S.append(S_next)
     return S
 
+def geometric_brownian_motion_multiple_paths(S0, mu, sigma, T, steps, n_paths=1000):
+    dt = T / steps
+    paths = np.zeros((steps + 1, n_paths))
+    paths[0] = S0
+
+    for i in range(1, steps + 1):
+        Z = np.random.standard_normal(n_paths)
+        paths[i] = paths[i-1] * np.exp((mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * Z)
+    return paths
+
 def norm_cdf(x):
     return (1.0 + math.erf(x / math.sqrt(2.0))) / 2.0
 
@@ -216,7 +226,7 @@ def plot_greeks_3d(spot, strike, taux, maturite, volatilite, position):
     ]
     return plots
 
-# Application Streamlit
+# Application principale
 
 def main():
     st.title("Option Pricing and Visualization")
@@ -227,7 +237,12 @@ def main():
     maturite = st.number_input("Maturity (days)", value=30)
     volatilite = st.number_input("Volatility", value=0.2)
 
-    tab1, tab2, tab3 = st.tabs(["Calculate Option Prices and Greeks", "Payoff Visualization", "Greeks Visualization"])
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "Calculate Option Prices and Greeks", 
+        "Payoff Visualization", 
+        "Greeks Visualization",
+        "Brownian Simulation"
+    ])
 
     global df_results, payoff_plot, greeks_plots
     df_results = pd.DataFrame()
@@ -251,6 +266,23 @@ def main():
             greeks_plots = plot_greeks_3d(spot, strike, taux, maturite, volatilite, position_greeks)
             for plot in greeks_plots:
                 st.pyplot(plot)
+
+    with tab4:
+        st.subheader("Simulate Multiple Brownian Motion Trajectories")
+        T = st.number_input("Total Time (in years)", value=1.0, key="T_brownian")
+        steps = st.number_input("Number of Steps", value=252, key="steps_brownian")
+
+        if st.button("Simulate 1000 Brownian Motions"):
+            paths = geometric_brownian_motion_multiple_paths(spot, taux, volatilite, T, int(steps), n_paths=1000)
+            time_grid = np.linspace(0, T, int(steps)+1)
+
+            fig, ax = plt.subplots(figsize=(12, 6))
+            ax.plot(time_grid, paths, linewidth=0.5, alpha=0.6)
+            ax.set_xlabel('Time (years)')
+            ax.set_ylabel('Simulated Spot Price')
+            ax.set_title('1000 Geometric Brownian Motion Trajectories')
+            ax.grid(True)
+            st.pyplot(fig)
 
 if __name__ == "__main__":
     main()
