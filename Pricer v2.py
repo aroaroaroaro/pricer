@@ -102,7 +102,7 @@ def simulate_brownian_motion(num_steps, num_paths):
     return W
 
 # --- App Streamlit ---
-st.title("📈 Simulateur de Greeks et Mouvements Browniens")
+st.title("Pricer d'option")
 
 spot = st.number_input("Prix Spot", value=100.0)
 strike = st.number_input("Prix d'Exercice (Strike)", value=100.0)
@@ -110,28 +110,29 @@ taux = st.number_input("Taux d'Intérêt Annuel (%)", value=5.0) / 100
 maturite = st.number_input("Maturité (en jours)", value=30)
 volatilite = st.number_input("Volatilité Annuelle (%)", value=20.0) / 100
 
-tabs = st.tabs(["1️⃣ Paramètres et Outputs", "2️⃣ Greeks 3D", "3️⃣ Simulation Brownienne", "4️⃣ Exporter Tout"])
+tabs = st.tabs(["Pricing d'option et greeks", "Payoff des options et graphiques des greeks", "Simulation Brownienne", "Exporter Tout"])
 
 # Variables globales pour éviter l'erreur
 greek_figures = {}
 payoff_figures = {}
 
 with tabs[0]:
-    st.header("Paramètres et Résultats des Options")
-    positions = ['Long Call', 'Long Put', 'Short Call', 'Short Put']
-    data = []
-    for position in positions:
-        sign = 1 if "Long" in position else -1
-        delta = sign * black_scholes_delta(spot, strike, maturite/365, taux, volatilite, 'call' if "Call" in position else 'put')
-        gamma = sign * black_scholes_gamma(spot, strike, maturite/365, taux, volatilite)
-        vega = sign * black_scholes_vega(spot, strike, maturite/365, taux, volatilite)
-        theta = sign * black_scholes_theta(spot, strike, maturite/365, taux, volatilite, 'call' if "Call" in position else 'put')
-        rho = sign * black_scholes_rho(spot, strike, maturite/365, taux, volatilite, 'call' if "Call" in position else 'put')
-        price = sign * 10  # Prix fictif pour exemple
-        data.append([position, price, delta, gamma, vega, theta, rho])
+    st.header("Pricing d'option et Greeks")
+    if st.button("Calculer"):
+        positions = ['Long Call', 'Long Put', 'Short Call', 'Short Put']
+        data = []
+        for position in positions:
+            sign = 1 if "Long" in position else -1
+            delta = sign * black_scholes_delta(spot, strike, maturite/365, taux, volatilite, 'call' if "Call" in position else 'put')
+            gamma = sign * black_scholes_gamma(spot, strike, maturite/365, taux, volatilite)
+            vega = sign * black_scholes_vega(spot, strike, maturite/365, taux, volatilite)
+            theta = sign * black_scholes_theta(spot, strike, maturite/365, taux, volatilite, 'call' if "Call" in position else 'put')
+            rho = sign * black_scholes_rho(spot, strike, maturite/365, taux, volatilite, 'call' if "Call" in position else 'put')
+            price = sign * 10  # Prix fictif pour exemple
+            data.append([position, price, delta, gamma, vega, theta, rho])
 
-    results_df = pd.DataFrame(data, columns=["Position", "Prix", "Delta", "Gamma", "Vega", "Theta", "Rho"])
-    st.dataframe(results_df)
+        results_df = pd.DataFrame(data, columns=["Position", "Prix", "Delta", "Gamma", "Vega", "Theta", "Rho"])
+        st.dataframe(results_df)
 
 with tabs[1]:
     st.header("Surfaces 3D des Greeks")
