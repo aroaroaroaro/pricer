@@ -224,7 +224,7 @@ with tabs[3]:
                     zip_file.writestr("inputs.csv", inputs_df.to_csv(index=False))
 
                     # Outputs (table Greeks)
-                    zip_file.writestr("greeks_table.csv", st.session_state.results_df.to_csv(index=False))
+                    zip_file.writestr("prices_and_greeks_table.csv", st.session_state.results_df.to_csv(index=False))
 
                     # Brownian Paths
                     if 'W_df' in st.session_state:
