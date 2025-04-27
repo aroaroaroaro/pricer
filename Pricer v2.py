@@ -74,6 +74,26 @@ def plot_greek_3d(spot, strike, taux, maturite, volatilite, greek):
     plt.close(fig)
     return fig
 
+# Fonction pour tracer les payoffs des options
+def plot_payoff(spot, strike, option_type):
+    spot_range = np.linspace(spot * 0.5, spot * 1.5, 100)
+    if option_type == 'Long Call':
+        payoff = np.maximum(spot_range - strike, 0)
+    elif option_type == 'Long Put':
+        payoff = np.maximum(strike - spot_range, 0)
+    elif option_type == 'Short Call':
+        payoff = -np.maximum(spot_range - strike, 0)
+    elif option_type == 'Short Put':
+        payoff = -np.maximum(strike - spot_range, 0)
+
+    fig, ax = plt.subplots()
+    ax.plot(spot_range, payoff)
+    ax.set_xlabel('Prix Spot')
+    ax.set_ylabel('Payoff')
+    ax.set_title(f'Payoff de {option_type}')
+    plt.close(fig)
+    return fig
+
 # Simulation mouvement brownien
 def simulate_brownian_motion(num_steps, num_paths):
     dt = 1/252
@@ -89,12 +109,12 @@ strike = st.number_input("Prix d'Exercice (Strike)", value=100.0)
 taux = st.number_input("Taux d'Intérêt Annuel (%)", value=5.0) / 100
 maturite = st.number_input("Maturité (en jours)", value=30)
 volatilite = st.number_input("Volatilité Annuelle (%)", value=20.0) / 100
-num_paths = st.number_input("Nombre de Trajectoires Browniennes", value=1000, step=100)
 
 tabs = st.tabs(["1️⃣ Paramètres et Outputs", "2️⃣ Greeks 3D", "3️⃣ Simulation Brownienne", "4️⃣ Exporter Tout"])
 
 # Variables globales pour éviter l'erreur
 greek_figures = {}
+payoff_figures = {}
 
 with tabs[0]:
     st.header("Paramètres et Résultats des Options")
@@ -123,8 +143,18 @@ with tabs[1]:
                 st.pyplot(fig)
         st.success("Affichage terminé ✅")
 
+    st.header("Graphiques des Payoffs des Options")
+    if st.button("Afficher les Graphiques des Payoffs"):
+        with st.spinner('Génération des graphiques des payoffs en cours...'):
+            for position in ['Long Call', 'Long Put', 'Short Call', 'Short Put']:
+                fig = plot_payoff(spot, strike, position)
+                payoff_figures[position] = fig
+                st.pyplot(fig)
+        st.success("Affichage terminé ✅")
+
 with tabs[2]:
     st.header("Simulation de Mouvements Browniens")
+    num_paths = st.number_input("Nombre de Trajectoires Browniennes", value=1000, step=100)
     if st.button("Simuler Brownien"):
         with st.spinner('Simulation en cours...'):
             W = simulate_brownian_motion(252, int(num_paths))
@@ -167,6 +197,13 @@ with tabs[3]:
                     fig.savefig(img_buf, format="png")
                     img_buf.seek(0)
                     zip_file.writestr(f"{greek.lower()}_surface.png", img_buf.getvalue())
+
+                # Graphiques Payoffs
+                for position, fig in payoff_figures.items():
+                    img_buf = io.BytesIO()
+                    fig.savefig(img_buf, format="png")
+                    img_buf.seek(0)
+                    zip_file.writestr(f"{position.lower().replace(' ', '_')}_payoff.png", img_buf.getvalue())
 
             buf.seek(0)
             st.download_button(
