@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import random
 import math
-import io
-import zipfile
 
 # Fonctions utilitaires
 
@@ -218,39 +216,6 @@ def plot_greeks_3d(spot, strike, taux, maturite, volatilite, position):
     ]
     return plots
 
-# Export function
-
-def export_data(inputs, df_results, payoff_plot=None, greeks_plots=None, filename='export.zip'):
-    df_inputs = pd.DataFrame.from_dict(inputs, orient='index', columns=['Value'])
-    inputs_csv = df_inputs.to_csv(index=True)
-    results_csv = df_results.to_csv(index=False)
-
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED) as zip_file:
-        zip_file.writestr("inputs.csv", inputs_csv)
-        zip_file.writestr("results.csv", results_csv)
-
-        if payoff_plot:
-            payoff_buf = io.BytesIO()
-            payoff_plot.savefig(payoff_buf, format='png')
-            payoff_buf.seek(0)
-            zip_file.writestr("payoff_plot.png", payoff_buf.getvalue())
-
-        if greeks_plots:
-            for i, plot in enumerate(greeks_plots):
-                greek_buf = io.BytesIO()
-                plot.savefig(greek_buf, format='png')
-                greek_buf.seek(0)
-                zip_file.writestr(f"greeks_plot_{i}.png", greek_buf.getvalue())
-
-    zip_buffer.seek(0)
-    st.download_button(
-        label="Download all data as ZIP",
-        data=zip_buffer,
-        file_name=filename,
-        mime="application/zip"
-    )
-
 # Application Streamlit
 
 def main():
@@ -262,7 +227,7 @@ def main():
     maturite = st.number_input("Maturity (days)", value=30)
     volatilite = st.number_input("Volatility", value=0.2)
 
-    tab1, tab2, tab3, tab4 = st.tabs(["Calculate Option Prices and Greeks", "Payoff Visualization", "Greeks Visualization", "Export Data"])
+    tab1, tab2, tab3 = st.tabs(["Calculate Option Prices and Greeks", "Payoff Visualization", "Greeks Visualization"])
 
     global df_results, payoff_plot, greeks_plots
     df_results = pd.DataFrame()
@@ -286,17 +251,6 @@ def main():
             greeks_plots = plot_greeks_3d(spot, strike, taux, maturite, volatilite, position_greeks)
             for plot in greeks_plots:
                 st.pyplot(plot)
-
-    with tab4:
-        inputs = {
-            'Spot Price': spot,
-            'Strike Price': strike,
-            'Interest Rate': taux,
-            'Maturity (days)': maturite,
-            'Volatility': volatilite
-        }
-        if st.button("Export Data"):
-            export_data(inputs, df_results, payoff_plot, greeks_plots)
 
 if __name__ == "__main__":
     main()
