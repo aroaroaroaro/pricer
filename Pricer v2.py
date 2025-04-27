@@ -95,10 +95,11 @@ def plot_payoff(spot, strike, option_type):
     return fig
 
 # Simulation mouvement brownien
-def simulate_brownian_motion(num_steps, num_paths):
+def simulate_brownian_motion(num_steps, num_paths, initial_value):
     dt = 1/252
     dW = np.random.normal(0, np.sqrt(dt), size=(num_steps, num_paths))
     W = np.cumsum(dW, axis=0)
+    W = initial_value * np.exp(W)  # Ajout de la valeur initiale
     return W
 
 # --- App Streamlit ---
@@ -115,6 +116,7 @@ tabs = st.tabs(["Pricing d'option et greeks", "Payoff des options et graphiques 
 # Variables globales pour éviter l'erreur
 greek_figures = {}
 payoff_figures = {}
+results_df = None  # Initialisation de results_df
 
 with tabs[0]:
     st.header("Pricing d'option et Greeks")
@@ -158,7 +160,7 @@ with tabs[2]:
     num_paths = st.number_input("Nombre de Trajectoires Browniennes", value=1000, step=100)
     if st.button("Simuler Brownien"):
         with st.spinner('Simulation en cours...'):
-            W = simulate_brownian_motion(252, int(num_paths))
+            W = simulate_brownian_motion(252, int(num_paths), spot)  # Utilisation de la valeur initiale
             fig, ax = plt.subplots(figsize=(12,6))
             ax.plot(W)
             ax.set_title("Trajectoires du Mouvement Brownien")
@@ -170,47 +172,50 @@ with tabs[2]:
 with tabs[3]:
     st.header("Exporter Tous les Résultats")
     if st.button("Exporter sous format ZIP"):
-        with st.spinner("Création de l'archive ZIP..."):
-            buf = io.BytesIO()
-            with zipfile.ZipFile(buf, "w") as zip_file:
-                # Inputs
-                inputs = {
-                    'Prix Spot': spot,
-                    'Strike': strike,
-                    'Taux Intérêt': taux,
-                    'Maturité (jours)': maturite,
-                    'Volatilité': volatilite,
-                    'Nombre de trajectoires': num_paths
-                }
-                inputs_df = pd.DataFrame(list(inputs.items()), columns=["Paramètre", "Valeur"])
-                zip_file.writestr("inputs.csv", inputs_df.to_csv(index=False))
+        if results_df is not None:  # Vérification que results_df est défini
+            with st.spinner("Création de l'archive ZIP..."):
+                buf = io.BytesIO()
+                with zipfile.ZipFile(buf, "w") as zip_file:
+                    # Inputs
+                    inputs = {
+                        'Prix Spot': spot,
+                        'Strike': strike,
+                        'Taux Intérêt': taux,
+                        'Maturité (jours)': maturite,
+                        'Volatilité': volatilite,
+                        'Nombre de trajectoires': num_paths
+                    }
+                    inputs_df = pd.DataFrame(list(inputs.items()), columns=["Paramètre", "Valeur"])
+                    zip_file.writestr("inputs.csv", inputs_df.to_csv(index=False))
 
-                # Outputs (table Greeks)
-                zip_file.writestr("greeks_table.csv", results_df.to_csv(index=False))
+                    # Outputs (table Greeks)
+                    zip_file.writestr("greeks_table.csv", results_df.to_csv(index=False))
 
-                # Brownian Paths
-                if 'W_df' in st.session_state:
-                    zip_file.writestr("brownian_paths.csv", st.session_state['W_df'].to_csv(index=False))
+                    # Brownian Paths
+                    if 'W_df' in st.session_state:
+                        zip_file.writestr("brownian_paths.csv", st.session_state['W_df'].to_csv(index=False))
 
-                # Graphiques Greeks
-                for greek, fig in greek_figures.items():
-                    img_buf = io.BytesIO()
-                    fig.savefig(img_buf, format="png")
-                    img_buf.seek(0)
-                    zip_file.writestr(f"{greek.lower()}_surface.png", img_buf.getvalue())
+                    # Graphiques Greeks
+                    for greek, fig in greek_figures.items():
+                        img_buf = io.BytesIO()
+                        fig.savefig(img_buf, format="png")
+                        img_buf.seek(0)
+                        zip_file.writestr(f"{greek.lower()}_surface.png", img_buf.getvalue())
 
-                # Graphiques Payoffs
-                for position, fig in payoff_figures.items():
-                    img_buf = io.BytesIO()
-                    fig.savefig(img_buf, format="png")
-                    img_buf.seek(0)
-                    zip_file.writestr(f"{position.lower().replace(' ', '_')}_payoff.png", img_buf.getvalue())
+                    # Graphiques Payoffs
+                    for position, fig in payoff_figures.items():
+                        img_buf = io.BytesIO()
+                        fig.savefig(img_buf, format="png")
+                        img_buf.seek(0)
+                        zip_file.writestr(f"{position.lower().replace(' ', '_')}_payoff.png", img_buf.getvalue())
 
-            buf.seek(0)
-            st.download_button(
-                label="📥 Télécharger l'archive ZIP",
-                data=buf,
-                file_name="resultats_simulation.zip",
-                mime="application/zip"
-            )
-        st.success("ZIP prêt ✅")
+                buf.seek(0)
+                st.download_button(
+                    label="📥 Télécharger l'archive ZIP",
+                    data=buf,
+                    file_name="resultats_simulation.zip",
+                    mime="application/zip"
+                )
+            st.success("ZIP prêt ✅")
+        else:
+            st.error("Veuillez d'abord calculer les résultats avant d'exporter.")
