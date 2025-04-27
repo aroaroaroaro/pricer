@@ -113,10 +113,13 @@ volatilite = st.number_input("Volatilité Annuelle (%)", value=20.0) / 100
 
 tabs = st.tabs(["Pricing d'option et greeks", "Payoff des options et graphiques des greeks", "Simulation Brownienne", "Exporter Tout"])
 
-# Variables globales pour éviter l'erreur
-greek_figures = {}
-payoff_figures = {}
-results_df = None  # Initialisation de results_df
+# Initialisation des variables d'état
+if 'results_df' not in st.session_state:
+    st.session_state.results_df = None
+if 'greek_figures' not in st.session_state:
+    st.session_state.greek_figures = {}
+if 'payoff_figures' not in st.session_state:
+    st.session_state.payoff_figures = {}
 
 with tabs[0]:
     st.header("Pricing d'option et Greeks")
@@ -133,8 +136,8 @@ with tabs[0]:
             price = sign * 10  # Prix fictif pour exemple
             data.append([position, price, delta, gamma, vega, theta, rho])
 
-        results_df = pd.DataFrame(data, columns=["Position", "Prix", "Delta", "Gamma", "Vega", "Theta", "Rho"])
-        st.dataframe(results_df)
+        st.session_state.results_df = pd.DataFrame(data, columns=["Position", "Prix", "Delta", "Gamma", "Vega", "Theta", "Rho"])
+        st.dataframe(st.session_state.results_df)
 
 with tabs[1]:
     st.header("Surfaces 3D des Greeks")
@@ -142,7 +145,7 @@ with tabs[1]:
         with st.spinner('Génération des surfaces 3D en cours...'):
             for greek in ['Delta', 'Gamma', 'Theta', 'Rho', 'Vega']:
                 fig = plot_greek_3d(spot, strike, taux, maturite, volatilite, greek)
-                greek_figures[greek] = fig
+                st.session_state.greek_figures[greek] = fig
                 st.pyplot(fig)
         st.success("Affichage terminé ✅")
 
@@ -151,7 +154,7 @@ with tabs[1]:
         with st.spinner('Génération des graphiques des payoffs en cours...'):
             for position in ['Long Call', 'Long Put', 'Short Call', 'Short Put']:
                 fig = plot_payoff(spot, strike, position)
-                payoff_figures[position] = fig
+                st.session_state.payoff_figures[position] = fig
                 st.pyplot(fig)
         st.success("Affichage terminé ✅")
 
@@ -172,7 +175,7 @@ with tabs[2]:
 with tabs[3]:
     st.header("Exporter Tous les Résultats")
     if st.button("Exporter sous format ZIP"):
-        if results_df is not None:  # Vérification que results_df est défini
+        if st.session_state.results_df is not None:  # Vérification que results_df est défini
             with st.spinner("Création de l'archive ZIP..."):
                 buf = io.BytesIO()
                 with zipfile.ZipFile(buf, "w") as zip_file:
@@ -189,21 +192,21 @@ with tabs[3]:
                     zip_file.writestr("inputs.csv", inputs_df.to_csv(index=False))
 
                     # Outputs (table Greeks)
-                    zip_file.writestr("greeks_table.csv", results_df.to_csv(index=False))
+                    zip_file.writestr("greeks_table.csv", st.session_state.results_df.to_csv(index=False))
 
                     # Brownian Paths
                     if 'W_df' in st.session_state:
                         zip_file.writestr("brownian_paths.csv", st.session_state['W_df'].to_csv(index=False))
 
                     # Graphiques Greeks
-                    for greek, fig in greek_figures.items():
+                    for greek, fig in st.session_state.greek_figures.items():
                         img_buf = io.BytesIO()
                         fig.savefig(img_buf, format="png")
                         img_buf.seek(0)
                         zip_file.writestr(f"{greek.lower()}_surface.png", img_buf.getvalue())
 
                     # Graphiques Payoffs
-                    for position, fig in payoff_figures.items():
+                    for position, fig in st.session_state.payoff_figures.items():
                         img_buf = io.BytesIO()
                         fig.savefig(img_buf, format="png")
                         img_buf.seek(0)
