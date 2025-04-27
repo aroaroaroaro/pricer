@@ -4,46 +4,39 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import io
 import zipfile
+from scipy.stats import norm
 from mpl_toolkits.mplot3d import Axes3D
 
 # Fonctions Greeks Black-Scholes
 def black_scholes_delta(S, K, T, r, sigma, option_type='call'):
-    from scipy.stats import norm
-    d1 = (np.log(S / K) + (r + 0.5 * sigma**2)*T) / (sigma*np.sqrt(T))
+    d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
     if option_type == 'call':
         return norm.cdf(d1)
     else:
-        return -norm.cdf(-d1)
+        return norm.cdf(d1) - 1
 
 def black_scholes_gamma(S, K, T, r, sigma):
-    from scipy.stats import norm
-    d1 = (np.log(S / K) + (r + 0.5 * sigma**2)*T) / (sigma*np.sqrt(T))
+    d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
     return norm.pdf(d1) / (S * sigma * np.sqrt(T))
 
 def black_scholes_vega(S, K, T, r, sigma):
-    from scipy.stats import norm
-    d1 = (np.log(S / K) + (r + 0.5 * sigma**2)*T) / (sigma*np.sqrt(T))
+    d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
     return S * norm.pdf(d1) * np.sqrt(T)
 
 def black_scholes_theta(S, K, T, r, sigma, option_type='call'):
-    from scipy.stats import norm
-    d1 = (np.log(S / K) + (r + 0.5 * sigma**2)*T) / (sigma*np.sqrt(T))
-    d2 = d1 - sigma*np.sqrt(T)
-    first_term = -(S * norm.pdf(d1) * sigma) / (2*np.sqrt(T))
+    d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
     if option_type == 'call':
-        second_term = r * K * np.exp(-r*T) * norm.cdf(d2)
-        return first_term - second_term
+        return -(S * norm.pdf(d1) * sigma) / (2 * np.sqrt(T)) - r * K * np.exp(-r * T) * norm.cdf(d2)
     else:
-        second_term = r * K * np.exp(-r*T) * norm.cdf(-d2)
-        return first_term + second_term
+        return -(S * norm.pdf(d1) * sigma) / (2 * np.sqrt(T)) + r * K * np.exp(-r * T) * norm.cdf(-d2)
 
 def black_scholes_rho(S, K, T, r, sigma, option_type='call'):
-    from scipy.stats import norm
-    d2 = (np.log(S / K) + (r - 0.5 * sigma**2)*T) / (sigma*np.sqrt(T))
+    d2 = (np.log(S / K) + (r - 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
     if option_type == 'call':
-        return K * T * np.exp(-r*T) * norm.cdf(d2)
+        return K * T * np.exp(-r * T) * norm.cdf(d2)
     else:
-        return -K * T * np.exp(-r*T) * norm.cdf(-d2)
+        return -K * T * np.exp(-r * T) * norm.cdf(-d2)
 
 # Fonction pour tracer la surface 3D d'un Greek
 def plot_greek_3d(spot, strike, taux, maturite, volatilite, greek):
@@ -96,11 +89,29 @@ def plot_payoff(spot, strike, option_type):
 
 # Simulation mouvement brownien
 def simulate_brownian_motion(num_steps, num_paths, initial_value):
-    dt = 1/252
+    dt = 1 / 252
     dW = np.random.normal(0, np.sqrt(dt), size=(num_steps, num_paths))
     W = np.cumsum(dW, axis=0)
     W = initial_value * np.exp(W)  # Ajout de la valeur initiale
     return W
+
+# Pricer Monte Carlo pour options européennes et américaines
+def monte_carlo_pricer(S, K, T, r, sigma, option_type='call', num_simulations=10000, num_steps=252):
+    dt = T / num_steps
+    discount_factor = np.exp(-r * T)
+    payoffs = np.zeros(num_simulations)
+
+    for i in range(num_simulations):
+        ST = S
+        for _ in range(num_steps):
+            ST *= np.exp((r - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * np.random.normal())
+        if option_type == 'call':
+            payoffs[i] = max(ST - K, 0)
+        else:
+            payoffs[i] = max(K - ST, 0)
+
+    price = discount_factor * np.mean(payoffs)
+    return price
 
 # --- App Streamlit ---
 st.title("Pricer d'option")
@@ -110,6 +121,7 @@ strike = st.number_input("Prix d'Exercice (Strike)", value=100.0)
 taux = st.number_input("Taux d'Intérêt Annuel (%)", value=5.0) / 100
 maturite = st.number_input("Maturité (en jours)", value=30)
 volatilite = st.number_input("Volatilité Annuelle (%)", value=20.0) / 100
+option_type = st.selectbox("Type d'Option", ['Européenne', 'Américaine'])
 
 tabs = st.tabs(["Pricing d'option et greeks", "Payoff des options et graphiques des greeks", "Simulation Brownienne", "Exporter Tout"])
 
@@ -128,15 +140,25 @@ with tabs[0]:
         data = []
         for position in positions:
             sign = 1 if "Long" in position else -1
-            delta = sign * black_scholes_delta(spot, strike, maturite/365, taux, volatilite, 'call' if "Call" in position else 'put')
-            gamma = sign * black_scholes_gamma(spot, strike, maturite/365, taux, volatilite)
-            vega = sign * black_scholes_vega(spot, strike, maturite/365, taux, volatilite)
-            theta = sign * black_scholes_theta(spot, strike, maturite/365, taux, volatilite, 'call' if "Call" in position else 'put')
-            rho = sign * black_scholes_rho(spot, strike, maturite/365, taux, volatilite, 'call' if "Call" in position else 'put')
-            price = sign * 10  # Prix fictif pour exemple
-            data.append([position, price, delta, gamma, vega, theta, rho])
+            delta = sign * black_scholes_delta(spot, strike, maturite / 365, taux, volatilite, 'call' if "Call" in position else 'put')
+            gamma = sign * black_scholes_gamma(spot, strike, maturite / 365, taux, volatilite)
+            vega = sign * black_scholes_vega(spot, strike, maturite / 365, taux, volatilite)
+            theta = sign * black_scholes_theta(spot, strike, maturite / 365, taux, volatilite, 'call' if "Call" in position else 'put')
+            rho = sign * black_scholes_rho(spot, strike, maturite / 365, taux, volatilite, 'call' if "Call" in position else 'put')
 
-        st.session_state.results_df = pd.DataFrame(data, columns=["Position", "Prix", "Delta", "Gamma", "Vega", "Theta", "Rho"])
+            if option_type == 'Européenne':
+                bs_price = sign * (spot * norm.cdf(delta) - strike * np.exp(-taux * maturite / 365) * norm.cdf(delta - sigma * np.sqrt(maturite / 365)))
+                mc_price = sign * monte_carlo_pricer(spot, strike, maturite / 365, taux, volatilite, 'call' if "Call" in position else 'put')
+                data.append([position, bs_price, mc_price, delta, gamma, vega, theta, rho])
+            else:
+                mc_price = sign * monte_carlo_pricer(spot, strike, maturite / 365, taux, volatilite, 'call' if "Call" in position else 'put')
+                data.append([position, mc_price, delta, gamma, vega, theta, rho])
+
+        if option_type == 'Européenne':
+            st.session_state.results_df = pd.DataFrame(data, columns=["Position", "Prix Black-Scholes", "Prix Monte Carlo", "Delta", "Gamma", "Vega", "Theta", "Rho"])
+        else:
+            st.session_state.results_df = pd.DataFrame(data, columns=["Position", "Prix Monte Carlo", "Delta", "Gamma", "Vega", "Theta", "Rho"])
+
         st.dataframe(st.session_state.results_df)
 
 with tabs[1]:
@@ -164,7 +186,7 @@ with tabs[2]:
     if st.button("Simuler Brownien"):
         with st.spinner('Simulation en cours...'):
             W = simulate_brownian_motion(252, int(num_paths), spot)  # Utilisation de la valeur initiale
-            fig, ax = plt.subplots(figsize=(12,6))
+            fig, ax = plt.subplots(figsize=(12, 6))
             ax.plot(W)
             ax.set_title("Trajectoires du Mouvement Brownien")
             st.pyplot(fig)
@@ -186,7 +208,8 @@ with tabs[3]:
                         'Taux Intérêt': taux,
                         'Maturité (jours)': maturite,
                         'Volatilité': volatilite,
-                        'Nombre de trajectoires': num_paths
+                        'Nombre de trajectoires': num_paths,
+                        'Type d\'Option': option_type
                     }
                     inputs_df = pd.DataFrame(list(inputs.items()), columns=["Paramètre", "Valeur"])
                     zip_file.writestr("inputs.csv", inputs_df.to_csv(index=False))
