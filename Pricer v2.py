@@ -92,7 +92,7 @@ def simulate_brownian_motion(num_steps, num_paths, initial_value):
     dt = 1 / 252
     dW = np.random.normal(0, np.sqrt(dt), size=(num_steps, num_paths))
     W = np.cumsum(dW, axis=0)
-    W = initial_value * np.exp(W)  # Ajout de la valeur initiale
+    W = initial_value * np.exp(W)  
     return W
 
 # Pricer Monte Carlo pour options européennes et américaines
@@ -194,7 +194,7 @@ with tabs[2]:
     num_paths = st.number_input("Nombre de Trajectoires Browniennes", value=1000, step=100)
     if st.button("Simuler Brownien"):
         with st.spinner('Simulation en cours...'):
-            W = simulate_brownian_motion(252, int(num_paths), spot)  # Utilisation de la valeur initiale
+            W = simulate_brownian_motion(252, int(num_paths), spot)  
             fig, ax = plt.subplots(figsize=(12, 6))
             ax.plot(W)
             ax.set_title("Trajectoires du Mouvement Brownien")
@@ -206,12 +206,12 @@ with tabs[2]:
 with tabs[3]:
     st.header("Exporter Tous les Résultats")
     if st.button("Exporter sous format ZIP"):
-        if st.session_state.results_df is not None:  # Vérification que results_df est défini
+        if st.session_state.results_df is not None:  
             with st.spinner("Création de l'archive ZIP..."):
                 buf = io.BytesIO()
                 with zipfile.ZipFile(buf, "w") as zip_file:
                     # Inputs
-                    inputs = {
+                    inputs = {  
                         'Prix Spot': spot,
                         'Strike': strike,
                         'Taux Intérêt': taux,
